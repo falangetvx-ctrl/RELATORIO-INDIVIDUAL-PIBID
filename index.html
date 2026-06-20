@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gerador de Relatório PIBID/UEAP - Padrão Falange</title>
+<style>
+/* =========================================================
+   GERADOR DE RELATÓRIO PIBID/UEAP - PADRÃO FALANGE
+   - Preenche dados variáveis
+   - Gera texto-base automaticamente
+   - Permite assinatura com canetinha/toque/mouse
+   - Exporta impressão/PDF fiel em A4
+   ========================================================= */
+
+:root{
+  --azul:#0b4f9f;
+  --verde:#0b8f4d;
+  --cinza:#e5e5e5;
+  --borda:#222;
+  --papel:#fff;
+  --fundo:#eef3f8;
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  font-family: Arial, Helvetica, sans-serif;
+  background:var(--fundo);
+  color:#111;
+}
+
+header.app-header{
+  background:linear-gradient(135deg,var(--azul),var(--verde));
+  color:white;
+  padding:18px 20px;
+  text-align:center;
+  box-shadow:0 3px 10px #0003;
+}
+
+header.app-header h1{ margin:0; font-size:24px; }
+header.app-header p{ margin:6px 0 0; font-size:14px; opacity:.95; }
+
+.app{
+  display:grid;
+  grid-template-columns: 380px 1fr;
+  gap:18px;
+  padding:18px;
+  align-items:start;
+}
+
+.panel{
+  background:white;
+  border-radius:12px;
+  box-shadow:0 3px 12px #0002;
+  padding:16px;
+  position:sticky;
+  top:12px;
+  max-height:calc(100vh - 24px);
+  overflow:auto;
+}
+
+.panel h2{
+  margin:0 0 12px;
+  color:var(--azul);
+  font-size:20px;
+}
+
+label{
+  display:block;
+  font-weight:bold;
+  font-size:13px;
+  margin-top:10px;
+}
+
+input, select, textarea{
+  width:100%;
+  padding:9px;
+  margin-top:4px;
+  border:1px solid #bbb;
+  border-radius:8px;
+  font-family:Arial, Helvetica, sans-serif;
+  font-size:14px;
+}
+
+textarea{ min-height:70px; resize:vertical; }
+
+.row{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+button{
+  border:none;
+  border-radius:10px;
+  padding:11px 12px;
+  font-weight:bold;
+  cursor:pointer;
+  margin-top:10px;
+  font-size:14px;
+}
+
+.btn-primary{ background:var(--azul); color:white; }
+.btn-green{ background:var(--verde); color:white; }
+.btn-red{ background:#b52020; color:white; }
+.btn-dark{ background:#222; color:white; }
+.btn-light{ background:#ddd; color:#111; }
+
+.actions{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+.preview-wrap{ overflow:auto; }
+
+/* Página A4 visual */
+.page{
+  width:210mm;
+  min-height:297mm;
+  background:var(--papel);
+  margin:0 auto 18px;
+  padding:11mm 11mm 12mm;
+  box-shadow:0 0 12px #0004;
+  font-size:12.2px;
+  line-height:1.25;
+}
+
+.doc-header{ text-align:center; font-weight:bold; position:relative; min-height:92px; }
+.logo-left, .logo-right{
+  position:absolute; top:0;
+  width:66px; height:66px;
+  object-fit:contain;
+}
+.logo-left{ left:0; }
+.logo-right{ right:0; }
+
+.doc-title{
+  background:#dcdcdc;
+  text-align:center;
+  font-weight:bold;
+  padding:3px;
+  margin:8px 0 10px;
+}
+
+.checks{ margin:8px 0 10px 55px; }
+
+.table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:6px;
+}
+.table td, .table th{
+  border:1px solid #333;
+  padding:5px 6px;
+  vertical-align:top;
+}
+.table th{ text-align:center; font-weight:bold; }
+
+.section-title{ font-weight:bold; margin-top:6px; }
+
+.generated-text{
+  white-space:pre-line;
+  text-align:justify;
+}
+
+.signature-area{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+  margin-top:28px;
+  text-align:center;
+  align-items:end;
+}
+
+.signature-slot{
+  height:76px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+
+.sig-line{ border-top:1px solid #111; padding-top:5px; min-height:38px; }
+
+.sig-canvas-box{
+  border:1px solid #333;
+  border-radius:8px;
+  background:white;
+  margin-top:6px;
+  overflow:hidden;
+}
+
+canvas#signaturePad{
+  width:100%;
+  height:150px;
+  display:block;
+  touch-action:none;
+  background:white;
+}
+
+.signature-img{
+  max-width:100%;
+  max-height:70px;
+  object-fit:contain;
+  display:block;
+  margin:0 auto 2px;
+}
+
+.small-note{ font-size:12px; color:#444; margin-top:8px; }
+
+@media(max-width:1000px){
+  .app{ grid-template-columns:1fr; }
+  .panel{ position:relative; max-height:none; }
+  .page{ transform-origin:top center; width:210mm; }
+}
+
+@media print{
+  body{ background:white; }
+  header.app-header, .panel{ display:none !important; }
+  .app{ display:block; padding:0; }
+  .preview-wrap{ overflow:visible; }
+  .page{
+    box-shadow:none;
+    margin:0;
+    width:210mm;
+    min-height:297mm;
+    page-break-after:always;
+  }
+  @page{ size:A4; margin:0; }
+}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <h1>Gerador de Relatório PIBID/UEAP</h1>
+  <p>Padrão Falange • preenchimento rápido • assinatura no tablet • salvar em PDF</p>
+</header>
+
+<main class="app">
+  <aside class="panel">
+    <h2>Dados do relatório</h2>
+
+    <div class="row">
+      <div>
+        <label>Mês/Ano</label>
+        <input id="mesAno" value="Maio" />
+      </div>
+      <div>
+        <label>Frequência</label>
+        <select id="frequencia">
+          <option value="integral">Integral</option>
+          <option value="parcial">Parcial</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Dia da assinatura</label>
+        <input id="diaAssinatura" placeholder="Ex.: 20" />
+      </div>
+      <div>
+        <label>Mês da assinatura</label>
+        <input id="mesAssinatura" placeholder="Ex.: junho" />
+      </div>
+    </div>
+
+    <label>Ano da assinatura</label>
+    <input id="anoAssinatura" placeholder="Ex.: 2026" />
+
+    <label>Nome do(a) bolsista</label>
+    <input id="bolsista" placeholder="Ex.: Wilson Cardoso" />
+
+    <label>Coordenador(a) de área</label>
+    <input id="coordenador" value="João Loureiro" />
+
+    <label>Professor(a) supervisor(a)</label>
+    <input id="supervisor" value="José Alessandro Camelo Bezerra" />
+
+    <label>Escola-campo</label>
+    <input id="escola" value="Escola Estadual Professor Gabriel Almeida Café" />
+
+    <label>Subprojeto</label>
+    <input id="subprojeto" value="Espanhol" />
+
+    <label>Perfil/destaque individual do bolsista</label>
+    <textarea id="perfil" placeholder="Ex.: demonstrou evolução na comunicação, superou a timidez e participou com mais segurança da regência."></textarea>
+
+    <label>1ª semana</label>
+    <textarea id="semana1">Atividades extraclasse relacionadas ao fechamento do primeiro trimestre letivo, com organização de registros acadêmicos, conferência de notas e apoio às demandas vinculadas ao sistema PROESC.</textarea>
+
+    <label>2ª semana</label>
+    <textarea id="semana2">Participação nas ações de recuperação paralela, auxiliando na aplicação de atividades, acompanhamento dos estudantes e organização dos materiais pedagógicos.</textarea>
+
+    <label>3ª semana</label>
+    <textarea id="semana3">Participação em aula cultural sobre os países hispânicos, abordando bandeiras, adjetivos pátrios, aspectos culturais e personalidades de destaque do mundo hispânico.</textarea>
+
+    <label>4ª semana</label>
+    <textarea id="semana4">Não ocorreram aulas regulares em virtude de ações institucionais promovidas pela escola, permanecendo o(a) bolsista envolvido(a) no planejamento das futuras atividades pedagógicas.</textarea>
+
+    <label>Descrição das atividades</label>
+    <textarea id="descricao" style="min-height:150px"></textarea>
+
+    <label>Observação do supervisor</label>
+    <textarea id="observacao" style="min-height:150px"></textarea>
+
+    <button class="btn-primary" onclick="gerarTextoAutomatico()">Gerar texto automático</button>
+    <button class="btn-green" onclick="atualizarDocumento()">Atualizar documento</button>
+
+    <h2 style="margin-top:18px">Assinatura</h2>
+    <label>Aplicar assinatura em</label>
+    <select id="assinaturaDestino">
+      <option value="professor">Professor(a) supervisor(a)</option>
+      <option value="bolsista">Bolsista</option>
+      <option value="ambos">Bolsista e professor(a)</option>
+    </select>
+    <div class="sig-canvas-box"><canvas id="signaturePad"></canvas></div>
+    <div class="actions">
+      <button class="btn-light" onclick="limparAssinatura()">Limpar tudo</button>
+      <button class="btn-dark" onclick="salvarAssinatura()">Aplicar</button>
+    </div>
+
+    <button class="btn-red" style="width:100%" onclick="salvarPDF()">Salvar / Imprimir em PDF</button>
+    <p class="small-note">No tablet, assine no quadro branco com a canetinha. Para PDF, escolha “Salvar como PDF” na janela de impressão.</p>
+  </aside>
+
+  <section class="preview-wrap">
+    <article class="page" id="paginaRelatorio">
+      <div class="doc-header">
+        <img class="logo-left" src="data:image/png;base64,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" alt="Logo UEAP">
+        <img class="logo-right" src="data:image/png;base64,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" alt="Logo PIBID UEAP">
+        GOVERNO DO ESTADO DO AMAPÁ<br>
+        UNIVERSIDADE DO ESTADO DO AMAPÁ<br>
+        PRÓ-REITORIA DE GRADUAÇÃO<br>
+        PROGRAMA INSTITUCIONAL DE BOLSAS DE INICIAÇÃO A DOCÊNCIA<br><br>
+        EDITAL Nº 031/2025 - PROGRAD/UEAP- fluxo continuo
+      </div>
+
+      <div class="doc-title">FREQUÊNCIA MENSAL DE ATIVIDADES DO(A) ACADÊMICO(A) BOLSISTA - PIBID/UEAP</div>
+
+      <p>Atestamos para os devidos fins que foram realizadas as atividades referentes ao plano de ação do Projeto Institucional e ao subprojeto em que tenho vinculado(a) o supracitado(a) BOLSISTA DE INICIAÇÃO A DOCÊNCIA - PIBID/UEAP, o(a) qual eu, como Professor(a) supervisor(a) atesto que o(a) bolsista:</p>
+      <div class="checks">
+        <div id="checkIntegral">( ) teve frequência INTEGRAL em suas atividades no corrente mês.</div>
+        <div id="checkParcial">( ) teve frequência PARCIAL em suas atividades no corrente mês.</div>
+      </div>
+
+      <table class="table">
+        <tr><th colspan="2">Preencher todos os campos abaixo</th></tr>
+        <tr><td><b>Agência de Fomento:</b> PIBID/UEAP</td><td><b>Mês/Ano da frequência:</b> <span data-field="mesAno"></span></td></tr>
+        <tr><td colspan="2"><b>Nome do(a) Bolsista:</b> <span data-field="bolsista"></span></td></tr>
+        <tr><td colspan="2"><b>Nome do(a) Coordenador(a) de área:</b> <span data-field="coordenador"></span></td></tr>
+        <tr><td colspan="2"><b>Nome do(a) professor(a) supervisor(a):</b> <span data-field="supervisor"></span></td></tr>
+        <tr><td colspan="2"><b>Escola-campo:</b> <span data-field="escola"></span></td></tr>
+        <tr><td colspan="2"><b>Subprojeto:</b> <span data-field="subprojeto"></span></td></tr>
+        <tr><td colspan="2"><b>Descrição sucinta das atividades desenvolvidas no mês:</b><br><div class="generated-text" data-field="descricao"></div></td></tr>
+        <tr><td colspan="2"><b>Campo para possível observação do(a) PROFESSOR(A) SUPERVISOR(A) (frequência, relações interpessoais, desenvolvimento das atividades propostas, dentre outros aspectos que devem ser melhorados nas atividades futuras do(a) bolsista):</b></td></tr>
+        <tr><td colspan="2"><div class="generated-text" data-field="observacao"></div></td></tr>
+      </table>
+
+      <p style="margin-top:28px">Macapá-AP, <span data-field="diaAssinatura"></span> de <span data-field="mesAssinatura"></span> de <span data-field="anoAssinatura"></span>.</p>
+
+      <div class="signature-area">
+        <div>
+          <div class="signature-slot"><img id="assinaturaBolsista" class="signature-img" alt=""></div>
+          <div class="sig-line">Assinatura do(a) BOLSISTA (A)</div>
+        </div>
+        <div>
+          <div class="signature-slot"><img id="assinaturaProfessor" class="signature-img" alt=""></div>
+          <div class="sig-line">Assinatura do(a) PROFESSOR(A) SUPERVISOR(A)</div>
+        </div>
+      </div>
+    </article>
+  </section>
+</main>
+
+<script>
+/* =========================================================
+   1. FUNÇÕES DE TEXTO AUTOMÁTICO
+   ========================================================= */
+function valor(id){ return document.getElementById(id).value.trim(); }
+
+function primeiroNome(nome){ return nome.split(' ')[0] || 'O(a) bolsista'; }
+
+function gerarTextoAutomatico(){
+  const nome = valor('bolsista') || 'o(a) bolsista';
+  const nomeCurto = primeiroNome(nome);
+  const mes = valor('mesAno') || 'mês informado';
+  const escola = valor('escola') || 'escola-campo';
+  const sub = valor('subprojeto') || 'subprojeto';
+  const perfil = valor('perfil') || 'demonstrou responsabilidade, comprometimento e participação nas atividades propostas';
+  const s1 = valor('semana1');
+  const s2 = valor('semana2');
+  const s3 = valor('semana3');
+  const s4 = valor('semana4');
+
+  const descricao = `No decorrer do mês de ${mes}, na ${escola}, ${nome} participou das atividades desenvolvidas pelo subprojeto de ${sub}, atuando em ações pedagógicas, organizacionais e de planejamento vinculadas ao desenvolvimento das atividades de ensino da Língua Espanhola.
+
+Durante a primeira semana do mês, ${s1.charAt(0).toLowerCase() + s1.slice(1)}
+
+Na segunda semana, ${s2.charAt(0).toLowerCase() + s2.slice(1)}
+
+Durante a terceira semana do mês, ${s3.charAt(0).toLowerCase() + s3.slice(1)}
+
+Na última semana do mês, ${s4.charAt(0).toLowerCase() + s4.slice(1)}
+
+As experiências vivenciadas durante o período contribuíram para o fortalecimento da formação inicial docente de ${nomeCurto}, ampliando sua participação em atividades de planejamento, acompanhamento pedagógico e condução de práticas educativas voltadas ao ensino de Língua Espanhola.`;
+
+  const observacao = `${nome} apresentou frequência ${valor('frequencia') === 'integral' ? 'integral' : 'parcial'} durante o mês de ${mes}, demonstrando responsabilidade, comprometimento e participação nas atividades desenvolvidas no âmbito do subprojeto.
+
+Ao longo do período, ${perfil}. Também demonstrou receptividade às orientações pedagógicas, capacidade de trabalhar em equipe e disposição para colaborar com os colegas nas diferentes demandas apresentadas.
+
+Durante as ações realizadas em sala de aula, evidenciou interesse pelo desenvolvimento das atividades pedagógicas e boa interação com os estudantes, contribuindo para a construção de um ambiente participativo e favorável à aprendizagem.
+
+Observa-se continuidade em seu processo de desenvolvimento acadêmico-profissional, especialmente no fortalecimento da comunicação pedagógica, da autonomia e da segurança em situações de atuação docente. Recomenda-se a continuidade das experiências práticas supervisionadas, considerando o desempenho apresentado ao longo do período.`;
+
+  document.getElementById('descricao').value = descricao;
+  document.getElementById('observacao').value = observacao;
+  atualizarDocumento();
+}
+
+/* =========================================================
+   2. ATUALIZAÇÃO DA PÁGINA A4
+   ========================================================= */
+function atualizarDocumento(){
+  const campos = ['mesAno','diaAssinatura','mesAssinatura','anoAssinatura','bolsista','coordenador','supervisor','escola','subprojeto','descricao','observacao'];
+  campos.forEach(campo=>{
+    document.querySelectorAll(`[data-field="${campo}"]`).forEach(el=>{
+      el.textContent = valor(campo) || '____________________________';
+    });
+  });
+  const freq = valor('frequencia');
+  document.getElementById('checkIntegral').textContent = freq === 'integral' ? '( x ) teve frequência INTEGRAL em suas atividades no corrente mês.' : '( ) teve frequência INTEGRAL em suas atividades no corrente mês.';
+  document.getElementById('checkParcial').textContent = freq === 'parcial' ? '( x ) teve frequência PARCIAL em suas atividades no corrente mês.' : '( ) teve frequência PARCIAL em suas atividades no corrente mês.';
+}
+
+/* =========================================================
+   3. ASSINATURA COM CANETINHA / TOQUE / MOUSE
+   ========================================================= */
+const canvas = document.getElementById('signaturePad');
+const ctx = canvas.getContext('2d');
+let desenhando = false;
+
+function ajustarCanvas(){
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * window.devicePixelRatio;
+  canvas.height = rect.height * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#111';
+}
+window.addEventListener('resize', ajustarCanvas);
+ajustarCanvas();
+
+function posicao(e){
+  const rect = canvas.getBoundingClientRect();
+  const p = e.touches ? e.touches[0] : e;
+  return { x:p.clientX - rect.left, y:p.clientY - rect.top };
+}
+function iniciar(e){ e.preventDefault(); desenhando = true; const p = posicao(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+function mover(e){ if(!desenhando) return; e.preventDefault(); const p = posicao(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }
+function parar(){ desenhando = false; }
+
+canvas.addEventListener('mousedown', iniciar);
+canvas.addEventListener('mousemove', mover);
+canvas.addEventListener('mouseup', parar);
+canvas.addEventListener('mouseleave', parar);
+canvas.addEventListener('touchstart', iniciar, {passive:false});
+canvas.addEventListener('touchmove', mover, {passive:false});
+canvas.addEventListener('touchend', parar);
+
+function limparAssinatura(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  document.getElementById('assinaturaBolsista').src = '';
+  document.getElementById('assinaturaProfessor').src = '';
+}
+function salvarAssinatura(){
+  const imagem = canvas.toDataURL('image/png');
+  const destino = document.getElementById('assinaturaDestino').value;
+
+  if(destino === 'bolsista' || destino === 'ambos'){
+    document.getElementById('assinaturaBolsista').src = imagem;
+  }
+  if(destino === 'professor' || destino === 'ambos'){
+    document.getElementById('assinaturaProfessor').src = imagem;
+  }
+}
+
+/* =========================================================
+   4. SALVAR EM PDF
+   ========================================================= */
+function salvarPDF(){
+  atualizarDocumento();
+  salvarAssinatura();
+  window.print();
+}
+
+atualizarDocumento();
+</script>
+</body>
+</html>
