@@ -184,7 +184,8 @@ button{
   overflow:hidden;
 }
 
-canvas#signaturePad{
+canvas#signaturePadBolsista,
+canvas#signaturePadProfessor{
   width:100%;
   height:150px;
   display:block;
@@ -301,21 +302,18 @@ canvas#signaturePad{
     <button class="btn-primary" onclick="gerarTextoAutomatico()">Gerar texto automático</button>
     <button class="btn-green" onclick="atualizarDocumento()">Atualizar documento</button>
 
-    <h2 style="margin-top:18px">Assinatura</h2>
-    <label>Aplicar assinatura em</label>
-    <select id="assinaturaDestino">
-      <option value="professor">Professor(a) supervisor(a)</option>
-      <option value="bolsista">Bolsista</option>
-      <option value="ambos">Bolsista e professor(a)</option>
-    </select>
-    <div class="sig-canvas-box"><canvas id="signaturePad"></canvas></div>
-    <div class="actions">
-      <button class="btn-light" onclick="limparAssinatura()">Limpar tudo</button>
-      <button class="btn-dark" onclick="salvarAssinatura()">Aplicar</button>
-    </div>
+    <h2 style="margin-top:18px">Assinaturas</h2>
+
+    <label>Assinatura do(a) bolsista</label>
+    <div class="sig-canvas-box"><canvas id="signaturePadBolsista"></canvas></div>
+    <button class="btn-light" style="width:100%" onclick="limparAssinaturaBolsista()">Limpar assinatura do bolsista</button>
+
+    <label>Assinatura do(a) professor(a) supervisor(a)</label>
+    <div class="sig-canvas-box"><canvas id="signaturePadProfessor"></canvas></div>
+    <button class="btn-light" style="width:100%" onclick="limparAssinaturaProfessor()">Limpar assinatura do professor</button>
 
     <button class="btn-red" style="width:100%" onclick="salvarPDF()">Salvar / Imprimir em PDF</button>
-    <p class="small-note">No tablet, assine no quadro branco com a canetinha. Para PDF, escolha “Salvar como PDF” na janela de impressão.</p>
+    <p class="small-note">No tablet, assine nos dois quadros com a canetinha. As duas assinaturas serão aplicadas automaticamente no PDF.</p>
   </aside>
 
   <section class="preview-wrap">
@@ -428,56 +426,96 @@ function atualizarDocumento(){
 }
 
 /* =========================================================
-   3. ASSINATURA COM CANETINHA / TOQUE / MOUSE
+   3. ASSINATURAS COM CANETINHA / TOQUE / MOUSE
    ========================================================= */
-const canvas = document.getElementById('signaturePad');
-const ctx = canvas.getContext('2d');
-let desenhando = false;
+const assinaturaPads = {};
 
-function ajustarCanvas(){
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * window.devicePixelRatio;
-  canvas.height = rect.height * window.devicePixelRatio;
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  ctx.lineWidth = 2.2;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#111';
+function prepararAssinatura(canvasId, imagemId){
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  let desenhando = false;
+
+  function ajustar(){
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+
+    /* Preserva o desenho ao redimensionar a tela */
+    const desenhoAnterior = canvas.width && canvas.height ? canvas.toDataURL('image/png') : null;
+
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#111';
+
+    if(desenhoAnterior){
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      img.src = desenhoAnterior;
+    }
+  }
+
+  function posicao(e){
+    const rect = canvas.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x:p.clientX - rect.left, y:p.clientY - rect.top };
+  }
+
+  function iniciar(e){
+    e.preventDefault();
+    desenhando = true;
+    const p = posicao(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+
+  function mover(e){
+    if(!desenhando) return;
+    e.preventDefault();
+    const p = posicao(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+
+  function parar(){ desenhando = false; }
+
+  canvas.addEventListener('mousedown', iniciar);
+  canvas.addEventListener('mousemove', mover);
+  canvas.addEventListener('mouseup', parar);
+  canvas.addEventListener('mouseleave', parar);
+  canvas.addEventListener('touchstart', iniciar, {passive:false});
+  canvas.addEventListener('touchmove', mover, {passive:false});
+  canvas.addEventListener('touchend', parar);
+
+  function aplicar(){
+    const img = document.getElementById(imagemId);
+    img.src = canvas.toDataURL('image/png');
+  }
+
+  function limpar(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById(imagemId).src = '';
+  }
+
+  ajustar();
+  return { canvas, ctx, ajustar, aplicar, limpar };
 }
-window.addEventListener('resize', ajustarCanvas);
-ajustarCanvas();
 
-function posicao(e){
-  const rect = canvas.getBoundingClientRect();
-  const p = e.touches ? e.touches[0] : e;
-  return { x:p.clientX - rect.left, y:p.clientY - rect.top };
-}
-function iniciar(e){ e.preventDefault(); desenhando = true; const p = posicao(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
-function mover(e){ if(!desenhando) return; e.preventDefault(); const p = posicao(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }
-function parar(){ desenhando = false; }
+assinaturaPads.bolsista = prepararAssinatura('signaturePadBolsista', 'assinaturaBolsista');
+assinaturaPads.professor = prepararAssinatura('signaturePadProfessor', 'assinaturaProfessor');
 
-canvas.addEventListener('mousedown', iniciar);
-canvas.addEventListener('mousemove', mover);
-canvas.addEventListener('mouseup', parar);
-canvas.addEventListener('mouseleave', parar);
-canvas.addEventListener('touchstart', iniciar, {passive:false});
-canvas.addEventListener('touchmove', mover, {passive:false});
-canvas.addEventListener('touchend', parar);
+window.addEventListener('resize', () => {
+  assinaturaPads.bolsista.ajustar();
+  assinaturaPads.professor.ajustar();
+});
 
-function limparAssinatura(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  document.getElementById('assinaturaBolsista').src = '';
-  document.getElementById('assinaturaProfessor').src = '';
-}
+function limparAssinaturaBolsista(){ assinaturaPads.bolsista.limpar(); }
+function limparAssinaturaProfessor(){ assinaturaPads.professor.limpar(); }
+
 function salvarAssinatura(){
-  const imagem = canvas.toDataURL('image/png');
-  const destino = document.getElementById('assinaturaDestino').value;
-
-  if(destino === 'bolsista' || destino === 'ambos'){
-    document.getElementById('assinaturaBolsista').src = imagem;
-  }
-  if(destino === 'professor' || destino === 'ambos'){
-    document.getElementById('assinaturaProfessor').src = imagem;
-  }
+  assinaturaPads.bolsista.aplicar();
+  assinaturaPads.professor.aplicar();
 }
 
 function aguardarImagensDaAssinatura(){
