@@ -480,13 +480,35 @@ function salvarAssinatura(){
   }
 }
 
+function aguardarImagensDaAssinatura(){
+  const imagens = [
+    document.getElementById('assinaturaBolsista'),
+    document.getElementById('assinaturaProfessor')
+  ].filter(img => img && img.src);
+
+  const promessas = imagens.map(img => {
+    if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+    if (img.decode) return img.decode().catch(() => {});
+    return new Promise(resolve => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+  });
+
+  return Promise.all(promessas);
+}
+
 /* =========================================================
    4. SALVAR EM PDF
    ========================================================= */
-function salvarPDF(){
+async function salvarPDF(){
   atualizarDocumento();
   salvarAssinatura();
-  window.print();
+
+  // Aguarda o navegador carregar a imagem da assinatura antes de abrir a impressão.
+  // Isso evita que a assinatura apareça na tela, mas suma no PDF.
+  await aguardarImagensDaAssinatura();
+  setTimeout(() => window.print(), 250);
 }
 
 atualizarDocumento();
