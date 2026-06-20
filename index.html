@@ -221,6 +221,19 @@ canvas#signaturePadProfessor{
 
 .small-note{ font-size:12px; color:#444; margin-top:8px; }
 
+.storage-box{
+  border:1px solid #ddd;
+  border-radius:10px;
+  padding:10px;
+  margin-top:10px;
+  background:#f7f9fc;
+}
+
+.storage-box .actions{
+  grid-template-columns:1fr 1fr;
+}
+
+
 @media(max-width:1000px){
   .app{ grid-template-columns:1fr; }
   .panel{ position:relative; max-height:none; }
@@ -324,6 +337,31 @@ canvas#signaturePadProfessor{
 
     <button class="btn-primary" onclick="gerarTextoAutomatico()">Gerar texto automático</button>
     <button class="btn-green" onclick="atualizarDocumento()">Atualizar documento</button>
+
+    <h2 style="margin-top:18px">Salvar para editar depois</h2>
+    <div class="storage-box">
+      <label>Nome do arquivo interno</label>
+      <input id="nomeRelatorioSalvo" placeholder="Ex.: Wilson - Maio 2026" />
+
+      <label>Relatórios salvos neste navegador</label>
+      <select id="listaRelatoriosSalvos"></select>
+
+      <div class="actions">
+        <button class="btn-dark" onclick="salvarInternamente()">Salvar</button>
+        <button class="btn-green" onclick="carregarInternamente()">Carregar</button>
+      </div>
+      <div class="actions">
+        <button class="btn-light" onclick="novoRelatorio()">Novo</button>
+        <button class="btn-red" onclick="excluirInternamente()">Excluir</button>
+      </div>
+
+      <div class="actions">
+        <button class="btn-dark" onclick="exportarRelatorioFalange()">Exportar arquivo</button>
+        <button class="btn-green" onclick="abrirSeletorRelatorioFalange()">Abrir arquivo</button>
+      </div>
+      <input id="arquivoRelatorioFalange" type="file" accept=".falange,.json,application/json" style="display:none" onchange="importarRelatorioFalange(event)" />
+      <p class="small-note">O salvamento interno fica neste navegador. Para enviar a outro aparelho, use “Exportar arquivo” e envie o .falange ao bolsista. Ele abre o site, clica em “Abrir arquivo”, assina e salva em PDF.</p>
+    </div>
 
     <h2 style="margin-top:18px">Assinaturas</h2>
 
@@ -521,8 +559,24 @@ function prepararAssinatura(canvasId, imagemId){
     document.getElementById(imagemId).src = '';
   }
 
+  function carregar(dataURL){
+    limpar();
+    if(!dataURL) return;
+
+    const imgAssinatura = document.getElementById(imagemId);
+    imgAssinatura.src = dataURL;
+
+    const rect = canvas.getBoundingClientRect();
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+    };
+    img.src = dataURL;
+  }
+
   ajustar();
-  return { canvas, ctx, ajustar, aplicar, limpar };
+  return { canvas, ctx, ajustar, aplicar, limpar, carregar };
 }
 
 assinaturaPads.bolsista = prepararAssinatura('signaturePadBolsista', 'assinaturaBolsista');
@@ -539,6 +593,216 @@ function limparAssinaturaProfessor(){ assinaturaPads.professor.limpar(); }
 function salvarAssinatura(){
   assinaturaPads.bolsista.aplicar();
   assinaturaPads.professor.aplicar();
+}
+
+/* =========================================================
+   4. SALVAR / CARREGAR INTERNAMENTE NO NAVEGADOR
+   ========================================================= */
+const CHAVE_RELATORIOS = 'falange_relatorios_pibid_salvos_v1';
+const camposSalvaveis = [
+  'mesAno','frequencia','diaAssinatura','mesAssinatura','anoAssinatura',
+  'bolsista','coordenador','supervisor','escola','subprojeto','perfil',
+  'semana1','semana2','semana3','semana4','descricao','observacao'
+];
+
+function obterBancoRelatorios(){
+  try{
+    return JSON.parse(localStorage.getItem(CHAVE_RELATORIOS)) || {};
+  }catch(e){
+    return {};
+  }
+}
+
+function gravarBancoRelatorios(banco){
+  localStorage.setItem(CHAVE_RELATORIOS, JSON.stringify(banco));
+}
+
+function nomeAutomaticoRelatorio(){
+  const nome = valor('bolsista') || 'Relatório PIBID';
+  const mes = valor('mesAno') || 'Mês';
+  const ano = valor('anoAssinatura') || '';
+  return `${nome} - ${mes}${ano ? ' - ' + ano : ''}`;
+}
+
+function atualizarListaRelatoriosSalvos(){
+  const lista = document.getElementById('listaRelatoriosSalvos');
+  if(!lista) return;
+
+  const banco = obterBancoRelatorios();
+  const nomes = Object.keys(banco).sort((a,b)=>a.localeCompare(b, 'pt-BR'));
+  lista.innerHTML = '';
+
+  if(nomes.length === 0){
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Nenhum relatório salvo ainda';
+    lista.appendChild(opt);
+    return;
+  }
+
+  nomes.forEach(nome=>{
+    const opt = document.createElement('option');
+    opt.value = nome;
+    opt.textContent = nome;
+    lista.appendChild(opt);
+  });
+}
+
+function coletarDadosDoRelatorio(){
+  salvarAssinatura();
+
+  const dados = { campos:{}, assinaturas:{}, atualizadoEm:new Date().toISOString() };
+  camposSalvaveis.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) dados.campos[id] = el.value;
+  });
+
+  dados.assinaturas.bolsista = document.getElementById('assinaturaBolsista')?.src || '';
+  dados.assinaturas.professor = document.getElementById('assinaturaProfessor')?.src || '';
+  return dados;
+}
+
+function aplicarDadosDoRelatorio(dados){
+  if(!dados || !dados.campos) return;
+
+  camposSalvaveis.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && Object.prototype.hasOwnProperty.call(dados.campos, id)){
+      el.value = dados.campos[id];
+    }
+  });
+
+  assinaturaPads.bolsista.carregar(dados.assinaturas?.bolsista || '');
+  assinaturaPads.professor.carregar(dados.assinaturas?.professor || '');
+  atualizarDocumento();
+}
+
+function salvarInternamente(){
+  atualizarDocumento();
+
+  const nomeInput = document.getElementById('nomeRelatorioSalvo');
+  const nome = (nomeInput.value.trim() || nomeAutomaticoRelatorio()).trim();
+  if(!nome){
+    alert('Digite um nome para salvar o relatório.');
+    return;
+  }
+
+  const banco = obterBancoRelatorios();
+  banco[nome] = coletarDadosDoRelatorio();
+  gravarBancoRelatorios(banco);
+
+  nomeInput.value = nome;
+  atualizarListaRelatoriosSalvos();
+  document.getElementById('listaRelatoriosSalvos').value = nome;
+  alert('Relatório salvo internamente neste navegador.');
+}
+
+function carregarInternamente(){
+  const nome = document.getElementById('listaRelatoriosSalvos').value;
+  const banco = obterBancoRelatorios();
+
+  if(!nome || !banco[nome]){
+    alert('Escolha um relatório salvo para carregar.');
+    return;
+  }
+
+  aplicarDadosDoRelatorio(banco[nome]);
+  document.getElementById('nomeRelatorioSalvo').value = nome;
+  alert('Relatório carregado para edição.');
+}
+
+function excluirInternamente(){
+  const nome = document.getElementById('listaRelatoriosSalvos').value;
+  const banco = obterBancoRelatorios();
+
+  if(!nome || !banco[nome]){
+    alert('Escolha um relatório salvo para excluir.');
+    return;
+  }
+
+  if(!confirm(`Excluir o relatório salvo "${nome}"?`)) return;
+  delete banco[nome];
+  gravarBancoRelatorios(banco);
+  document.getElementById('nomeRelatorioSalvo').value = '';
+  atualizarListaRelatoriosSalvos();
+}
+
+function limparNomeArquivo(nome){
+  return String(nome || 'relatorio-pibid')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9-_ ]/g, '')
+    .trim()
+    .replace(/\s+/g, '_') || 'relatorio-pibid';
+}
+
+function exportarRelatorioFalange(){
+  atualizarDocumento();
+  const dados = coletarDadosDoRelatorio();
+  dados.tipoArquivo = 'RELATORIO_PIBID_FALANGE';
+  dados.versaoArquivo = 1;
+  dados.exportadoEm = new Date().toISOString();
+
+  const nomeBase = document.getElementById('nomeRelatorioSalvo')?.value.trim() || nomeAutomaticoRelatorio();
+  const nomeArquivo = limparNomeArquivo(nomeBase) + '.falange';
+
+  const conteudo = JSON.stringify(dados, null, 2);
+  const blob = new Blob([conteudo], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+
+  alert('Arquivo .falange exportado. Envie esse arquivo para o bolsista abrir no aplicativo.');
+}
+
+function abrirSeletorRelatorioFalange(){
+  const input = document.getElementById('arquivoRelatorioFalange');
+  if(!input) return;
+  input.value = '';
+  input.click();
+}
+
+function importarRelatorioFalange(event){
+  const arquivo = event.target.files && event.target.files[0];
+  if(!arquivo) return;
+
+  const leitor = new FileReader();
+  leitor.onload = () => {
+    try{
+      const dados = JSON.parse(String(leitor.result || ''));
+      if(!dados || !dados.campos){
+        throw new Error('Arquivo inválido.');
+      }
+
+      aplicarDadosDoRelatorio(dados);
+      const nomeSemExtensao = arquivo.name.replace(/\.(falange|json)$/i, '');
+      const nomeInput = document.getElementById('nomeRelatorioSalvo');
+      if(nomeInput) nomeInput.value = nomeSemExtensao;
+      alert('Arquivo aberto com sucesso. Agora é possível editar, assinar e gerar o PDF.');
+    }catch(erro){
+      alert('Não foi possível abrir este arquivo. Verifique se ele foi exportado por este aplicativo.');
+      console.error(erro);
+    }
+  };
+  leitor.readAsText(arquivo, 'utf-8');
+}
+
+function novoRelatorio(){
+  if(!confirm('Limpar os campos para iniciar um novo relatório?')) return;
+
+  ['bolsista','perfil','descricao','observacao','diaAssinatura','mesAssinatura','anoAssinatura','nomeRelatorioSalvo'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+
+  limparAssinaturaBolsista();
+  limparAssinaturaProfessor();
+  atualizarDocumento();
 }
 
 function aguardarImagensDaAssinatura(){
@@ -572,6 +836,7 @@ async function salvarPDF(){
   setTimeout(() => window.print(), 250);
 }
 
+atualizarListaRelatoriosSalvos();
 atualizarDocumento();
 </script>
 </body>
