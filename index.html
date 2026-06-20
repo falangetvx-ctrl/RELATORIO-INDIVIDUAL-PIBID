@@ -167,14 +167,25 @@ button{
   align-items:end;
 }
 
-.signature-slot{
-  height:76px;
+.signature-place{
+  height:88px;
+  position:relative;
   display:flex;
-  align-items:flex-end;
-  justify-content:center;
+  flex-direction:column;
+  justify-content:flex-end;
 }
 
-.sig-line{ border-top:1px solid #111; padding-top:5px; min-height:38px; }
+.signature-slot{
+  height:0;
+}
+
+.sig-line{
+  border-top:1px solid #111;
+  padding-top:5px;
+  min-height:34px;
+  position:relative;
+  z-index:1;
+}
 
 .sig-canvas-box{
   border:1px solid #333;
@@ -194,11 +205,16 @@ canvas#signaturePadProfessor{
 }
 
 .signature-img{
-  max-width:100%;
-  max-height:70px;
+  max-width:90%;
+  max-height:64px;
   object-fit:contain;
   display:block;
-  margin:0 auto 2px;
+  position:absolute;
+  left:50%;
+  bottom:28px;
+  transform:translateX(-50%);
+  z-index:2;
+  pointer-events:none;
 }
 
 .small-note{ font-size:12px; color:#444; margin-top:8px; }
@@ -352,12 +368,12 @@ canvas#signaturePadProfessor{
       <p style="margin-top:28px">Macapá-AP, <span data-field="diaAssinatura"></span> de <span data-field="mesAssinatura"></span> de <span data-field="anoAssinatura"></span>.</p>
 
       <div class="signature-area">
-        <div>
-          <div class="signature-slot"><img id="assinaturaBolsista" class="signature-img" alt=""></div>
+        <div class="signature-place">
+          <img id="assinaturaBolsista" class="signature-img" alt="">
           <div class="sig-line">Assinatura do(a) BOLSISTA (A)</div>
         </div>
-        <div>
-          <div class="signature-slot"><img id="assinaturaProfessor" class="signature-img" alt=""></div>
+        <div class="signature-place">
+          <img id="assinaturaProfessor" class="signature-img" alt="">
           <div class="sig-line">Assinatura do(a) PROFESSOR(A) SUPERVISOR(A)</div>
         </div>
       </div>
