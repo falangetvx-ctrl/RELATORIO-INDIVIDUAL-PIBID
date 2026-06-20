@@ -110,6 +110,8 @@ button{
 
 /* Página A4 visual */
 .page{
+  page-break-inside:auto;
+
   width:210mm;
   min-height:297mm;
   background:var(--papel);
@@ -222,7 +224,9 @@ canvas#signaturePadProfessor{
 @media(max-width:1000px){
   .app{ grid-template-columns:1fr; }
   .panel{ position:relative; max-height:none; }
-  .page{ transform-origin:top center; width:210mm; }
+  .page{
+  page-break-inside:auto;
+ transform-origin:top center; width:210mm; }
 }
 
 @media print{
@@ -231,13 +235,16 @@ canvas#signaturePadProfessor{
   .app{ display:block; padding:0; }
   .preview-wrap{ overflow:visible; }
   .page{
+  page-break-inside:auto;
+
     box-shadow:none;
     margin:0;
     width:210mm;
     min-height:297mm;
     page-break-after:always;
   }
-  @page{ size:A4; margin:0; }
+  @page{ size:A4; margin:10mm; }
+.table,tr,td,th{page-break-inside:avoid;} p,div{orphans:3;widows:3;}
 }
 </style>
 </head>
